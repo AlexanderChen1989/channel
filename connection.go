@@ -142,35 +142,44 @@ func ConnectTo(_url string, args url.Values) (*Connection, error) {
 	return conn, nil
 }
 
+func (conn *Connection) removeChan(ch *Channel) {
+	ch.Close()
+	delete(conn.chans, ch.topic)
+}
+
+func (conn *Connection) addChan(ch *Channel) {
+	conn.chans[ch.topic] = ch
+	go ch.loop()
+}
+
+func (conn *Connection) checkTopic(topic string) error {
+	if topic == "" {
+		return errors.New("Topic is empty.")
+	}
+
+	if conn.chans[topic] != nil {
+		return errors.New("Allready joined to '" + topic + "'.")
+	}
+
+	return nil
+}
+
 func (conn *Connection) JoinTo(topic string) (*Channel, error) {
 	conn.lock.Lock()
 	defer conn.lock.Unlock()
 
 	topic = strings.TrimSpace(topic)
-	if topic == "" {
-		return nil, errors.New("Topic is empty.")
-	}
-
-	if conn.chans[topic] != nil {
-		return nil, errors.New("Allready joined to '" + topic + "'.")
-	}
-
-	ctx, cancel := context.WithCancel(conn.ctx)
-
-	ch := &Channel{
-		ctx:    ctx,
-		conn:   conn,
-		topic:  topic,
-		status: ChannelReady,
-		cancel: cancel,
-		msgCh:  make(chan *Message),
-		refMap: make(map[int]chan *Message),
-	}
-	go ch.loop()
-	if err := ch.Join(); err != nil {
+	if err := conn.checkTopic(topic); err != nil {
 		return nil, err
 	}
-	conn.chans[topic] = ch
+
+	ch := NewChannel(conn, topic)
+	conn.addChan(ch)
+
+	if err := ch.Join(); err != nil {
+		conn.removeChan(ch)
+		return nil, err
+	}
 
 	return ch, nil
 }
