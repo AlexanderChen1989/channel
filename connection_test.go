@@ -12,4 +12,7 @@ func TestConnection(t *testing.T) {
 	defer func() {
 		assert.Nil(t, conn.Close())
 	}()
+	ch, err := conn.JoinTo("rooms:lobby")
+	assert.Nil(t, err)
+	defer ch.Close()
 }

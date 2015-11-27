@@ -2,7 +2,9 @@ package channel
 
 import (
 	"errors"
+	"fmt"
 	"sync"
+	"time"
 
 	"golang.org/x/net/context"
 )
@@ -24,7 +26,6 @@ type Channel struct {
 	cancel func()
 	msgCh  chan *Message
 
-	counter   int
 	lock      sync.Mutex
 	recvChs   map[string]chan *Message
 	recvAllCh chan *Message
@@ -50,7 +51,29 @@ func (ch *Channel) Join() error {
 	if ch.status != ChannelReady {
 		return errors.New("Channel for " + ch.topic + " status " + ch.status + ".")
 	}
-	return nil
+	msg := &Message{
+		Topic:   ch.topic,
+		Event:   EventPhxJoin,
+		Payload: "",
+		Ref:     ch.conn.Ref(),
+	}
+	mch, err := ch.Request(msg)
+	if err != nil {
+		return err
+	}
+
+	mchall, err := ch.RecvAll()
+
+	select {
+	case reply := <-mch:
+		fmt.Println(reply)
+		return nil
+	case reply := <-mchall:
+		fmt.Println(reply)
+		return nil
+	case <-time.After(5 * time.Second):
+		return errors.New("Join timeout.")
+	}
 }
 
 func (ch *Channel) dispatch(msg *Message) {
@@ -80,33 +103,21 @@ func (ch *Channel) dispatch(msg *Message) {
 	}
 }
 
-func Msg(event string, payload interface{}) *Message {
-	return nil
-}
-
-func (ch *Channel) mkRef() int {
-	return 0
-}
-
 func (ch *Channel) Request(msg *Message) (chan *Message, error) {
-	ch.lock.Lock()
-	defer ch.lock.Unlock()
-
-	if ch.refMap == nil {
-		ch.refMap = make(map[int]chan *Message)
-	}
-
 	msg.Ref = ch.conn.Ref()
 	msg.Topic = ch.topic
+	if err := ch.conn.Send(msg); err != nil {
+		return nil, err
+	}
+
 	mch := make(chan *Message, 1)
+
+	ch.lock.Lock()
+	defer ch.lock.Unlock()
 
 	ch.refMap[msg.Ref] = mch
 
 	return mch, nil
-}
-
-func (ch *Channel) Send(msg *Message) error {
-	return nil
 }
 
 var ErrRecvChTaken = errors.New("Recv chan has been taken.")

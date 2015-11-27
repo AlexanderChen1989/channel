@@ -3,6 +3,7 @@ package channel
 import (
 	"errors"
 	"fmt"
+	"log"
 	"net/url"
 	"path"
 	"strings"
@@ -49,7 +50,10 @@ type Connection struct {
 	socketURL string
 	lock      sync.Mutex
 	ctx       context.Context
+	cancel    func()
+	status    string
 	conn      *websocket.Conn
+	sendLock  sync.Mutex
 	chans     map[string]*Channel
 	count     int
 }
@@ -60,6 +64,7 @@ func (conn *Connection) connect() (err error) {
 }
 
 func (conn *Connection) Close() error {
+	conn.cancel()
 	return conn.conn.Close()
 }
 
@@ -67,6 +72,34 @@ func (conn *Connection) Ref() int {
 	// FIXME: thread safe!
 	conn.count++
 	return conn.count
+}
+
+func (conn *Connection) Send(msg *Message) error {
+	conn.sendLock.Lock()
+	defer conn.sendLock.Unlock()
+
+	return websocket.JSON.Send(conn.conn, msg)
+}
+
+func (conn *Connection) loop() {
+	// FIXME: ?
+	for {
+		var msg Message
+		err := websocket.JSON.Receive(conn.conn, &msg)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		log.Println(msg)
+		if conn.chans[msg.Topic] == nil {
+			continue
+		}
+		select {
+		case conn.chans[msg.Topic].msgCh <- &msg:
+		default:
+		}
+	}
+
 }
 
 func ConnectTo(_url string, args url.Values) (*Connection, error) {
@@ -93,14 +126,20 @@ func ConnectTo(_url string, args url.Values) (*Connection, error) {
 	surl.Path = path.Join(surl.Path, "websocket")
 	surl.RawQuery = args.Encode()
 
+	ctx, cancel := context.WithCancel(context.Background())
 	conn := &Connection{
-		ctx:       context.Background(),
+		ctx:       ctx,
+		cancel:    cancel,
 		chans:     make(map[string]*Channel),
 		originURL: fmt.Sprintf("%s://%s", oscheme, surl.Host),
 		socketURL: surl.String(),
 	}
+	if err := conn.connect(); err != nil {
+		return nil, err
+	}
+	go conn.loop()
 
-	return conn, conn.connect()
+	return conn, nil
 }
 
 func (conn *Connection) JoinTo(topic string) (*Channel, error) {
@@ -125,7 +164,9 @@ func (conn *Connection) JoinTo(topic string) (*Channel, error) {
 		status: ChannelReady,
 		cancel: cancel,
 		msgCh:  make(chan *Message),
+		refMap: make(map[int]chan *Message),
 	}
+	go ch.loop()
 	if err := ch.Join(); err != nil {
 		return nil, err
 	}
