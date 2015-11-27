@@ -11,9 +11,10 @@ type Channel struct {
 	ctx  context.Context
 	conn *Connection
 
-	topic     string
-	cancel    func()
-	msgCh     chan *Message
+	topic  string
+	cancel func()
+	msgCh  chan *Message
+
 	counter   int
 	lock      sync.Mutex
 	recvChs   map[string]chan *Message
@@ -53,10 +54,6 @@ func (ch *Channel) dispatch(msg *Message) {
 	}
 }
 
-type Recver struct {
-	recvCh chan *Message
-}
-
 func Msg(event string, payload interface{}) *Message {
 	return nil
 }
@@ -66,13 +63,18 @@ func (ch *Channel) mkRef() int {
 }
 
 func (ch *Channel) Request(msg *Message) (chan *Message, error) {
-	msg.Ref = ch.mkRef()
+	ch.lock.Lock()
+	defer ch.lock.Unlock()
+
+	if ch.refMap == nil {
+		ch.refMap = make(map[int]chan *Message)
+	}
+
+	msg.Ref = ch.conn.Ref()
 	msg.Topic = ch.topic
 	mch := make(chan *Message, 1)
 
-	ch.lock.Lock()
 	ch.refMap[msg.Ref] = mch
-	ch.lock.Unlock()
 
 	return mch, nil
 }
@@ -87,7 +89,11 @@ func (ch *Channel) Recv(event string) (chan *Message, error) {
 	ch.lock.Lock()
 	defer ch.lock.Unlock()
 
-	if _, ok := ch.recvChs[event]; ok {
+	if ch.recvChs == nil {
+		ch.recvChs = make(map[string]chan *Message)
+	}
+
+	if ch.recvChs[event] != nil {
 		return nil, ErrRecvChTaken
 	}
 
