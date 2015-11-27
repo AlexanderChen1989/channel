@@ -7,11 +7,20 @@ import (
 	"golang.org/x/net/context"
 )
 
+const (
+	ChannelClosed  = "closed"
+	ChannelErrored = "errored"
+	ChannelJoined  = "joined"
+	ChannelJoining = "joining"
+	ChannelReady   = "ready"
+)
+
 type Channel struct {
 	ctx  context.Context
 	conn *Connection
 
 	topic  string
+	status string
 	cancel func()
 	msgCh  chan *Message
 
@@ -22,15 +31,26 @@ type Channel struct {
 	refMap    map[int]chan *Message
 }
 
+func (ch *Channel) Close() {
+	ch.cancel()
+}
+
 func (ch *Channel) loop() {
 	for {
 		select {
 		case <-ch.ctx.Done():
-			break
+			return
 		case msg := <-ch.msgCh:
 			go ch.dispatch(msg)
 		}
 	}
+}
+
+func (ch *Channel) Join() error {
+	if ch.status != ChannelReady {
+		return errors.New("Channel for " + ch.topic + " status " + ch.status + ".")
+	}
+	return nil
 }
 
 func (ch *Channel) dispatch(msg *Message) {
@@ -39,17 +59,23 @@ func (ch *Channel) dispatch(msg *Message) {
 
 	select {
 	case ch.refMap[msg.Ref] <- msg:
+	case <-ch.ctx.Done():
+		return
 	default:
 	}
 	delete(ch.refMap, msg.Ref)
 
 	select {
 	case ch.recvChs[msg.Event] <- msg:
+	case <-ch.ctx.Done():
+		return
 	default:
 	}
 
 	select {
 	case ch.recvAllCh <- msg:
+	case <-ch.ctx.Done():
+		return
 	default:
 	}
 }

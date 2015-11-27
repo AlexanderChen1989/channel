@@ -37,11 +37,6 @@ const TRANSPORTS = {
 const (
 	VSN = "1.0.0"
 
-	ChannelClosed  = "closed"
-	ChannelErrored = "errored"
-	ChannelJoined  = "joined"
-	ChannelJoining = "joining"
-
 	EventPhxClose = "phx_close"
 	EventPhxError = "phx_error"
 	EventPhxJoin  = "phx_join"
@@ -127,10 +122,13 @@ func (conn *Connection) JoinTo(topic string) (*Channel, error) {
 		ctx:    ctx,
 		conn:   conn,
 		topic:  topic,
+		status: ChannelReady,
 		cancel: cancel,
 		msgCh:  make(chan *Message),
 	}
-
+	if err := ch.Join(); err != nil {
+		return nil, err
+	}
 	conn.chans[topic] = ch
 
 	return ch, nil
