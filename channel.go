@@ -122,7 +122,7 @@ func (ch *Channel) dispatch(msg *Message) {
 	ch.dispatchToRecvAllCh(msg)
 }
 
-func NewChannel(conn *Connection, topic string) *Channel {
+func newChannel(conn *Connection, topic string) *Channel {
 	ctx, cancel := context.WithCancel(conn.ctx)
 
 	ch := &Channel{

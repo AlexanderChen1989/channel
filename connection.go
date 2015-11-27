@@ -48,7 +48,7 @@ const (
 type Connection struct {
 	originURL string
 	socketURL string
-	lock      sync.Mutex
+	joinLock  sync.Mutex
 	ctx       context.Context
 	cancel    func()
 	status    string
@@ -165,15 +165,15 @@ func (conn *Connection) checkTopic(topic string) error {
 }
 
 func (conn *Connection) JoinTo(topic string) (*Channel, error) {
-	conn.lock.Lock()
-	defer conn.lock.Unlock()
+	conn.joinLock.Lock()
+	defer conn.joinLock.Unlock()
 
 	topic = strings.TrimSpace(topic)
 	if err := conn.checkTopic(topic); err != nil {
 		return nil, err
 	}
 
-	ch := NewChannel(conn, topic)
+	ch := newChannel(conn, topic)
 	conn.addChan(ch)
 
 	if err := ch.Join(); err != nil {
