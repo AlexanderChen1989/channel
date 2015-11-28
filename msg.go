@@ -6,7 +6,3 @@ type Message struct {
 	Payload interface{} `json:"payload"`
 	Ref     int         `json:"ref"`
 }
-
-func Msg(event string, payload interface{}) *Message {
-	return nil
-}
