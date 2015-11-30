@@ -1,66 +1,83 @@
 package client
 
+import "errors"
+
+const (
+	ChClosed  = "closed"
+	ChErrored = "errored"
+	ChJoined  = "joined"
+	ChJoing   = "joining"
+)
+
 type Chan struct {
-	Parent
-	Topic string
-	msgCh chan *Msg
-	pullM map[interface{}]chan *Msg
+	conn   *Conn
+	topic  string
+	status string
 }
 
-func NewChan(parent Parent, topic string) *Chan {
-	ch := &Chan{Parent: parent}
-	ch.Topic = topic
-	ch.pullM = map[interface{}]chan *Msg{}
-	return ch
-}
-
-// PushPullRemover
-func (ch *Chan) Pull(key interface{}, mch chan *Msg) error {
-	ch.pullM[key] = mch
-	return nil
-}
-
-func (ch *Chan) Push(msg *Msg) error {
-	msg.Topic = ch.Topic
-	ch.Parent.Push(msg)
-	return nil
-}
-
-func (ch *Chan) Remove(key interface{}) {
-	delete(ch.pullM, key)
-}
-
-func (ch *Chan) loop() {
-	ch.Parent.Pull(ch.Topic, ch.msgCh)
-	for {
-		select {
-		case msg := <-ch.msgCh:
-			go ch.dispatch(msg)
-		}
+func (conn *Conn) Chan(topic string) (*Chan, error) {
+	if conn.status != ConnOpen {
+		return nil, errors.New("Connection is " + conn.status)
 	}
-}
 
-func (ch *Chan) dispatch(msg *Msg) error {
-	select {
-	case ch.pullM[msg.Topic] <- msg:
-	default:
+	ch := &Chan{
+		conn:   conn,
+		topic:  topic,
+		status: ChJoing,
 	}
-	return nil
+
+	return ch, nil
 }
 
-func (ch *Chan) Close() error {
-	// FIXME
-	ch.Parent.Remove(ch.Topic)
-	return nil
+func (ch *Chan) Recv() *MsgCh {
+	return ch.conn.register(ch.topic)
 }
 
-func (ch *Chan) Request(payload interface{}) *Request {
-	msg := &Msg{Payload: payload}
-	return NewRequest(ch, msg)
+const (
+	ChanClose = "phx_close"
+	ChanError = "phx_error"
+
+	// server reply event
+	ChanReply = "phx_reply"
+
+	// client send event
+	ChanJoin  = "phx_join"
+	ChanLeave = "phx_leave"
+)
+
+func (ch *Chan) Join() (*MsgCh, error) {
+	return ch.Request(ChanJoin, "")
 }
 
-func (ch *Chan) Join() error {
-	// TODO
+func (ch *Chan) Leave() (*MsgCh, error) {
+	return ch.Request(ChanLeave, "")
+}
 
-	return nil
+func (ch *Chan) On(evt string) *MsgCh {
+	return ch.conn.register(ch.topic + evt)
+}
+
+func (ch *Chan) Request(evt string, payload interface{}) (*MsgCh, error) {
+	msg := &Msg{
+		Topic:   ch.topic,
+		Event:   evt,
+		Ref:     ch.conn.makeRef(),
+		Payload: payload,
+	}
+	mch := ch.conn.register(msg.Ref)
+	if err := ch.conn.Send(msg); err != nil {
+		mch.Close()
+		return nil, err
+	}
+	return mch, nil
+}
+
+func (ch *Chan) Push(evt string, payload interface{}) error {
+	msg := &Msg{
+		Topic:   ch.topic,
+		Event:   evt,
+		Ref:     ch.conn.makeRef(),
+		Payload: payload,
+	}
+	return ch.conn.Send(msg)
 }

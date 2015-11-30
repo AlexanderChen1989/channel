@@ -5,19 +5,64 @@ import (
 	"fmt"
 	"net/url"
 	"path"
-	"strings"
+	"sync"
 
 	"golang.org/x/net/websocket"
 )
+
+const VSN = "1.0.0"
 
 const (
 	ConnConnecting = "connecting"
 	ConnOpen       = "open"
 	ConnClosing    = "closing"
-	ConnClosed     = "closed"
+	Connclosed     = "closed"
 )
 
-func Connect(_url string, args url.Values) (*Conn, error) {
+type Conn struct {
+	sock    Socket
+	status  string
+	alive   bool
+	mcpool  *sync.Pool
+	mpool   *sync.Pool
+	bufNum  int
+	chM     map[interface{}]map[*MsgCh]bool
+	chMLock sync.RWMutex
+	counter int
+}
+
+func (conn *Conn) loop() {
+	conn.alive = true
+	for conn.alive {
+		msg, err := conn.sock.Recv()
+		if err != nil {
+			fmt.Printf("%s\n", err)
+			break
+		}
+		conn.dispatch(msg)
+	}
+	conn.alive = false
+}
+
+func (conn *Conn) Recv() *MsgCh {
+	return conn.register(&allMsg)
+}
+
+func (conn *Conn) Close() error {
+	conn.alive = false
+	return conn.sock.Close()
+}
+
+func (conn *Conn) Send(msg *Msg) error {
+	return conn.sock.Send(msg)
+}
+
+func (conn *Conn) makeRef() string {
+	conn.counter++
+	return fmt.Sprint(conn.counter)
+}
+
+func ConnectTo(_url string, args url.Values) (*Conn, error) {
 	surl, err := url.Parse(_url)
 
 	if err != nil {
@@ -41,92 +86,105 @@ func Connect(_url string, args url.Values) (*Conn, error) {
 	surl.Path = path.Join(surl.Path, "websocket")
 	surl.RawQuery = args.Encode()
 
-	conn := &Conn{
-		status:    ConnConnecting,
-		originURL: fmt.Sprintf("%s://%s", oscheme, surl.Host),
-		socketURL: surl.String(),
-	}
-	if err := conn.connect(); err != nil {
+	originURL := fmt.Sprintf("%s://%s", oscheme, surl.Host)
+	socketURL := surl.String()
+
+	wconn, err := websocket.Dial(socketURL, "", originURL)
+	if err != nil {
 		return nil, err
 	}
-	conn.status = ConnOpen
+	bufNum := 2
+	conn := &Conn{
+		sock:   &WSocket{conn: wconn},
+		status: ConnOpen,
+		bufNum: bufNum,
+		mcpool: &sync.Pool{
+			New: func() interface{} {
+				return &MsgCh{
+					ch: make(chan *Msg, bufNum),
+				}
+			},
+		},
+		mpool: &sync.Pool{
+			New: func() interface{} {
+				return make(map[*MsgCh]bool)
+			},
+		},
+		chM: make(map[interface{}]map[*MsgCh]bool),
+	}
+
 	go conn.loop()
 
 	return conn, nil
 }
 
-type Conn struct {
-	*websocket.Conn
-	status    string
-	originURL string
-	socketURL string
-	counter   int
-	pullM     map[interface{}]chan *Msg
-}
-
-func (conn *Conn) loop() {
-	for {
-		var msg Msg
-		// FIXME: ?
-		err := websocket.JSON.Receive(conn.Conn, &msg)
-		if err != nil {
-			fmt.Println(err)
-		}
-		conn.dispatch(&msg)
-	}
-}
-
-func (conn *Conn) connect() (err error) {
-	conn.Conn, err = websocket.Dial(conn.socketURL, "", conn.originURL)
-	return
-}
-
-func (conn *Conn) dispatch(msg *Msg) error {
+func sendToCh(mch *MsgCh, msg *Msg) {
 	select {
-	case conn.pullM[msg.Topic] <- msg:
+	case mch.ch <- msg:
 	default:
 	}
-	return nil
 }
 
-// PushPullRemover
-func (conn *Conn) Push(msg *Msg) error {
-	return websocket.JSON.Send(conn.Conn, msg)
-}
-
-func (conn *Conn) Pull(key interface{}, ch chan *Msg) error {
-	conn.pullM[key] = ch
-	return nil
-}
-
-func (conn *Conn) Remove(key interface{}) {
-	delete(conn.pullM, key)
-}
-
-// Closer
-func (conn *Conn) Close() error {
-	return conn.Conn.Close()
-}
-
-// GetPuter
-func (conn *Conn) Get() chan *Msg {
-	return make(chan *Msg, 1)
-}
-func (conn *Conn) Put(chan *Msg) {}
-
-// RefMaker
-func (conn *Conn) MakeRef() string {
-	// FIXME
-	conn.counter++
-	return fmt.Sprint(conn.counter)
-}
-
-func (conn *Conn) Chan(topic string) (*Chan, error) {
-	topic = strings.TrimSpace(topic)
-	ch := NewChan(conn, topic)
-	if err := ch.Join(); err != nil {
-		ch.Close()
-		return nil, err
+func (conn *Conn) sendToChs(mchs map[*MsgCh]bool, msg *Msg) {
+	for mch := range mchs {
+		go sendToCh(mch, msg)
 	}
-	return ch, nil
+}
+
+func (conn *Conn) dispatch(msg *Msg) {
+	conn.chMLock.RLock()
+	defer conn.chMLock.RUnlock()
+
+	go conn.sendToChs(conn.chM[&allMsg], msg)
+	go conn.sendToChs(conn.chM[msg.Topic], msg)
+	go conn.sendToChs(conn.chM[msg.Topic+msg.Event], msg)
+	go conn.sendToChs(conn.chM[msg.Ref], msg)
+}
+
+var allMsg int
+
+func (conn *Conn) register(key interface{}) *MsgCh {
+	conn.chMLock.Lock()
+	defer conn.chMLock.Unlock()
+
+	ch := conn.mcpool.Get().(*MsgCh)
+	ch.conn = conn
+	ch.key = key
+
+	// FIXME: ?
+	// check whether chan is open and clean elements in open chan
+	open := true
+	for i := 0; i < conn.bufNum; i++ {
+		select {
+		case _, open = <-ch.ch:
+			if !open {
+				break
+			}
+		default:
+			break
+		}
+	}
+	if !open {
+		ch.ch = make(chan *Msg, conn.bufNum)
+	}
+
+	if conn.chM[key] == nil {
+		conn.chM[key] = conn.mpool.Get().(map[*MsgCh]bool)
+	}
+	conn.chM[key][ch] = true
+	return ch
+}
+
+func (conn *Conn) unregister(key interface{}, ch *MsgCh) {
+	conn.chMLock.Lock()
+	defer conn.chMLock.Unlock()
+
+	m := conn.chM[key]
+	if m != nil {
+		delete(m, ch)
+		conn.mcpool.Put(ch)
+	}
+	if len(m) == 0 {
+		conn.mpool.Put(m)
+	}
 }
