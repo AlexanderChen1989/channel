@@ -9,7 +9,7 @@ import (
 
 func TestRegCenter(t *testing.T) {
 	c := newRegCenter()
-	const num = 10
+	const num = 10000
 	var chs []*Puller
 	for i := 0; i < num; i++ {
 		chs = append(chs, c.register(fmt.Sprint(i)))
