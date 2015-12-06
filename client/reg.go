@@ -2,10 +2,16 @@ package client
 
 import "sync"
 
+// Puller channel to receive result
 type Puller struct {
 	center *regCenter
 	ch     chan *Msg
 	key    string
+}
+
+// Close return puller to regCenter
+func (puller *Puller) Close() {
+	puller.center.unregister(puller)
 }
 
 type regCenter struct {
@@ -29,11 +35,12 @@ func (center *regCenter) register(key string) *Puller {
 	if m == nil {
 		m = center.pool.getPullerMap()
 	}
-	mch := center.pool.getPuller()
-	mch.key = key
-	m[mch] = true
+	puller := center.pool.getPuller()
+	puller.center = center
+	puller.key = key
+	m[puller] = true
 	center.regs[key] = m
-	return mch
+	return puller
 }
 
 func (center *regCenter) unregister(puller *Puller) {

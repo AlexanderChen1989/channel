@@ -18,7 +18,7 @@ func TestRegCenter(t *testing.T) {
 		assert.NotNil(t, c.get(ch.key))
 	}
 	for _, ch := range chs {
-		c.unregister(ch)
+		ch.Close()
 	}
 	for _, ch := range chs {
 		assert.Nil(t, c.get(ch.key))
