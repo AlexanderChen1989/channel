@@ -3,49 +3,49 @@ package client
 import "sync"
 
 type pool struct {
-	msgCh    *sync.Pool
-	msgChMap *sync.Pool
+	puller    *sync.Pool
+	pullerMap *sync.Pool
 }
 
 func newPool() *pool {
 	return &pool{
-		msgCh: &sync.Pool{
+		puller: &sync.Pool{
 			New: func() interface{} {
-				return &MsgCh{
+				return &Puller{
 					ch: make(chan *Msg, 1),
 				}
 			},
 		},
-		msgChMap: &sync.Pool{
+		pullerMap: &sync.Pool{
 			New: func() interface{} {
-				return make(map[*MsgCh]bool)
+				return make(map[*Puller]bool)
 			},
 		},
 	}
 }
 
-func (p *pool) getMsgCh() *MsgCh {
-	return p.msgCh.Get().(*MsgCh)
+func (p *pool) getPuller() *Puller {
+	return p.puller.Get().(*Puller)
 }
 
-func (p *pool) putMsgCh(mch *MsgCh) {
-	if mch == nil {
+func (p *pool) putPuller(puller *Puller) {
+	if puller == nil {
 		return
 	}
 	select {
-	case <-mch.Recv():
+	case <-puller.ch:
 	default:
 	}
-	p.msgCh.Put(mch)
+	p.puller.Put(puller)
 }
 
-func (p *pool) getMsgChMap() map[*MsgCh]bool {
-	return p.msgChMap.Get().(map[*MsgCh]bool)
+func (p *pool) getPullerMap() map[*Puller]bool {
+	return p.pullerMap.Get().(map[*Puller]bool)
 }
 
-func (p *pool) putMsgChMap(m map[*MsgCh]bool) {
+func (p *pool) putPullerMap(m map[*Puller]bool) {
 	if m == nil {
 		return
 	}
-	p.msgChMap.Put(m)
+	p.pullerMap.Put(m)
 }

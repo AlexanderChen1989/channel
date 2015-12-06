@@ -10,17 +10,17 @@ import (
 func TestRegCenter(t *testing.T) {
 	c := newRegCenter()
 	const num = 10
-	var chs []*MsgCh
+	var chs []*Puller
 	for i := 0; i < num; i++ {
 		chs = append(chs, c.register(fmt.Sprint(i)))
 	}
 	for _, ch := range chs {
-		assert.NotNil(t, c.get(ch.key.(string)))
+		assert.NotNil(t, c.get(ch.key))
 	}
 	for _, ch := range chs {
-		c.unregister(ch.key.(string), ch)
+		c.unregister(ch)
 	}
 	for _, ch := range chs {
-		assert.Nil(t, c.get(ch.key.(string)))
+		assert.Nil(t, c.get(ch.key))
 	}
 }
