@@ -4,8 +4,8 @@ import "golang.org/x/net/websocket"
 
 // Socket interface for easy test
 type Socket interface {
-	Send(*Msg) error
-	Recv() (*Msg, error)
+	Send(*Message) error
+	Recv() (*Message, error)
 	Close() error
 }
 
@@ -15,7 +15,7 @@ type WSocket struct {
 }
 
 // Send implments Socket.Send
-func (ws *WSocket) Send(msg *Msg) error {
+func (ws *WSocket) Send(msg *Message) error {
 	return websocket.JSON.Send(ws.conn, msg)
 }
 
@@ -25,7 +25,7 @@ func (ws *WSocket) Close() error {
 }
 
 // Recv implements Socket.Recv
-func (ws *WSocket) Recv() (*Msg, error) {
-	msg := &Msg{}
+func (ws *WSocket) Recv() (*Message, error) {
+	msg := &Message{}
 	return msg, websocket.JSON.Receive(ws.conn, msg)
 }

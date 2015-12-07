@@ -30,13 +30,13 @@ const (
 
 // Chan channel
 type Chan struct {
-	conn   *Conn
+	conn   *Connection
 	topic  string
 	status string
 }
 
 // Chan create a new channel on connection
-func (conn *Conn) Chan(topic string) (*Chan, error) {
+func (conn *Connection) Chan(topic string) (*Chan, error) {
 	if conn.status != ConnOpen {
 		return nil, errors.New("Connection is " + conn.status)
 	}
@@ -51,35 +51,35 @@ func (conn *Conn) Chan(topic string) (*Chan, error) {
 }
 
 // Recv register a MsgCh to recv all msg on channel
-func (ch *Chan) Recv() *MsgCh {
-	return ch.conn.register(ch.topic)
+func (ch *Chan) OnMessage() *Puller {
+	return ch.conn.center.register(ch.topic)
 }
 
 // Join channel join, return a MsgCh to receive join result
-func (ch *Chan) Join() (*MsgCh, error) {
+func (ch *Chan) Join() (*Puller, error) {
 	return ch.Request(ChanJoin, "")
 }
 
 // Leave channel leave, return a MsgCh to receive leave result
-func (ch *Chan) Leave() (*MsgCh, error) {
+func (ch *Chan) Leave() (*Puller, error) {
 	return ch.Request(ChanLeave, "")
 }
 
 // On return a MsgCh to receive all msg on some event on this channel
-func (ch *Chan) On(evt string) *MsgCh {
-	return ch.conn.register(ch.topic + evt)
+func (ch *Chan) OnEvent(evt string) *Puller {
+	return ch.conn.center.register(ch.topic + evt)
 }
 
 // Request send a msg to channel and return a MsgCh to receive reply
-func (ch *Chan) Request(evt string, payload interface{}) (*MsgCh, error) {
-	msg := &Msg{
+func (ch *Chan) Request(evt string, payload interface{}) (*Puller, error) {
+	msg := &Message{
 		Topic:   ch.topic,
 		Event:   evt,
-		Ref:     ch.conn.makeRef(),
+		Ref:     ch.conn.ref.ref(),
 		Payload: payload,
 	}
-	mch := ch.conn.register(msg.Ref)
-	if err := ch.conn.Send(msg); err != nil {
+	mch := ch.conn.center.register(msg.Ref)
+	if err := ch.conn.push(msg); err != nil {
 		mch.Close()
 		return nil, err
 	}
@@ -88,11 +88,11 @@ func (ch *Chan) Request(evt string, payload interface{}) (*MsgCh, error) {
 
 // Push send a msg to channel
 func (ch *Chan) Push(evt string, payload interface{}) error {
-	msg := &Msg{
+	msg := &Message{
 		Topic:   ch.topic,
 		Event:   evt,
-		Ref:     ch.conn.makeRef(),
+		Ref:     ch.conn.ref.ref(),
 		Payload: payload,
 	}
-	return ch.conn.Send(msg)
+	return ch.conn.push(msg)
 }

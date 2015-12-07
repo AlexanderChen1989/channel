@@ -2,18 +2,6 @@ package client
 
 import "sync"
 
-// Puller channel to receive result
-type Puller struct {
-	center *regCenter
-	ch     chan *Msg
-	key    string
-}
-
-// Close return puller to regCenter
-func (puller *Puller) Close() {
-	puller.center.unregister(puller)
-}
-
 type regCenter struct {
 	sync.RWMutex
 	pool *pool

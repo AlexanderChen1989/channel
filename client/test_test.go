@@ -11,8 +11,8 @@ import (
 type socket struct {
 	counter int
 	timeout time.Duration
-	msg     *Msg
-	msgs    []*Msg
+	msg     *Message
+	msgs    []*Message
 }
 
 func (sock *socket) Send(msg *Msg) error {

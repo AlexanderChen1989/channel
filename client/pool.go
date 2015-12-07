@@ -12,7 +12,7 @@ func newPool() *pool {
 		puller: &sync.Pool{
 			New: func() interface{} {
 				return &Puller{
-					ch: make(chan *Msg, 1),
+					ch: make(chan *Message, 1),
 				}
 			},
 		},
