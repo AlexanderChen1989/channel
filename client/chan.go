@@ -50,7 +50,7 @@ func (conn *Connection) Chan(topic string) (*Chan, error) {
 	return ch, nil
 }
 
-// Recv register a MsgCh to recv all msg on channel
+// OnMessage register a MsgCh to recv all msg on channel
 func (ch *Chan) OnMessage() *Puller {
 	return ch.conn.center.register(ch.topic)
 }
@@ -65,7 +65,7 @@ func (ch *Chan) Leave() (*Puller, error) {
 	return ch.Request(ChanLeave, "")
 }
 
-// On return a MsgCh to receive all msg on some event on this channel
+// OnEvent return a MsgCh to receive all msg on some event on this channel
 func (ch *Chan) OnEvent(evt string) *Puller {
 	return ch.conn.center.register(ch.topic + evt)
 }

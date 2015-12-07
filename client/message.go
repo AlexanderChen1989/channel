@@ -1,5 +1,6 @@
 package client
 
+// Message message
 type Message struct {
 	Topic   string      `json:"topic"`
 	Event   string      `json:"event"`
@@ -19,6 +20,7 @@ func (puller *Puller) Close() {
 	puller.center.unregister(puller)
 }
 
+// Pull pull messge from chan
 func (puller *Puller) Pull() <-chan *Message {
 	return puller.ch
 }
