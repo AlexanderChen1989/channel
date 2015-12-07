@@ -73,8 +73,7 @@ func Connect(_url string, args url.Values) (*Connection, error) {
 		status: ConnOpen,
 	}
 
-	go conn.pullLoop()
-	go conn.coreLoop()
+	conn.start()
 
 	return conn, nil
 }
@@ -117,6 +116,11 @@ func (conn *Connection) coreLoop() {
 			conn.dispatch(msg)
 		}
 	}
+}
+
+func (conn *Connection) start() {
+	go conn.pullLoop()
+	go conn.coreLoop()
 }
 
 func (conn *Connection) Close() error {

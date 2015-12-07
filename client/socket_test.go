@@ -20,7 +20,6 @@ func (sock *socket) Close() error {
 }
 
 func (sock *socket) Recv() (*Message, error) {
-	time.Sleep(100 * time.Millisecond)
 	msg := <-sock.msgs
 	switch payload := msg.Payload.(type) {
 	case string:
