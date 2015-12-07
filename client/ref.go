@@ -10,7 +10,7 @@ type refMaker struct {
 	index int
 }
 
-func (mk *refMaker) ref() string {
+func (mk *refMaker) makeRef() string {
 	mk.Lock()
 	ref := mk.index
 	mk.index++

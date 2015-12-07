@@ -119,6 +119,11 @@ func (conn *Connection) coreLoop() {
 	}
 }
 
+func (conn *Connection) Close() error {
+	conn.cancel()
+	return conn.sock.Close()
+}
+
 func (conn *Connection) pushToChan(mch *Puller, msg *Message) {
 	select {
 	case mch.ch <- msg:

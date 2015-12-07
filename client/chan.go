@@ -75,15 +75,15 @@ func (ch *Chan) Request(evt string, payload interface{}) (*Puller, error) {
 	msg := &Message{
 		Topic:   ch.topic,
 		Event:   evt,
-		Ref:     ch.conn.ref.ref(),
+		Ref:     ch.conn.ref.makeRef(),
 		Payload: payload,
 	}
-	mch := ch.conn.center.register(msg.Ref)
+	puller := ch.conn.center.register(msg.Ref)
 	if err := ch.conn.push(msg); err != nil {
-		mch.Close()
+		puller.Close()
 		return nil, err
 	}
-	return mch, nil
+	return puller, nil
 }
 
 // Push send a msg to channel
@@ -91,7 +91,7 @@ func (ch *Chan) Push(evt string, payload interface{}) error {
 	msg := &Message{
 		Topic:   ch.topic,
 		Event:   evt,
-		Ref:     ch.conn.ref.ref(),
+		Ref:     ch.conn.ref.makeRef(),
 		Payload: payload,
 	}
 	return ch.conn.push(msg)
