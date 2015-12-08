@@ -5,13 +5,13 @@ import "sync"
 type regCenter struct {
 	sync.RWMutex
 	pool *pool
-	regs map[string]map[*Puller]bool
+	regs map[string][]*Puller
 }
 
 func newRegCenter() *regCenter {
 	return &regCenter{
 		pool: newPool(),
-		regs: make(map[string]map[*Puller]bool),
+		regs: make(map[string][]*Puller),
 	}
 }
 
@@ -19,15 +19,12 @@ func (center *regCenter) register(key string) *Puller {
 	center.Lock()
 	defer center.Unlock()
 
-	m := center.regs[key]
-	if m == nil {
-		m = center.pool.getPullerMap()
-	}
 	puller := center.pool.getPuller()
 	puller.center = center
 	puller.key = key
-	m[puller] = true
-	center.regs[key] = m
+
+	center.regs[key] = append(center.regs[key], puller)
+
 	return puller
 }
 
@@ -39,23 +36,25 @@ func (center *regCenter) unregister(puller *Puller) {
 		return
 	}
 
-	if m := center.regs[puller.key]; m != nil {
-		delete(m, puller)
-		center.pool.putPuller(puller)
-		if len(m) == 0 {
-			delete(center.regs, puller.key)
-			center.pool.putPullerMap(m)
+	pullers := center.regs[puller.key]
+	for i, _puller := range pullers {
+		if _puller != puller {
+			continue
 		}
+		pullers[i] = pullers[len(pullers)-1]
+		center.regs[puller.key] = pullers[:len(pullers)-1]
+		return
 	}
+
 }
 
 func (center *regCenter) getPullers(key string) []*Puller {
 	center.RLock()
 	defer center.RUnlock()
 
-	var pullers []*Puller
-	for puller := range center.regs[key] {
-		pullers = append(pullers, puller)
-	}
-	return pullers
+	pullers := center.regs[key]
+	copied := make([]*Puller, len(pullers))
+	copy(copied, pullers)
+
+	return copied
 }
