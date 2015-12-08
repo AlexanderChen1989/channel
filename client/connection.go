@@ -128,16 +128,16 @@ func (conn *Connection) Close() error {
 	return conn.sock.Close()
 }
 
-func (conn *Connection) pushToChan(mch *Puller, msg *Message) {
+func (conn *Connection) pushToChan(puller *Puller, msg *Message) {
 	select {
-	case mch.ch <- msg:
+	case puller.ch <- msg:
 	default:
 	}
 }
 
-func (conn *Connection) pushToChans(wg *sync.WaitGroup, mchs map[*Puller]bool, msg *Message) {
-	for mch := range mchs {
-		go conn.pushToChan(mch, msg)
+func (conn *Connection) pushToChans(wg *sync.WaitGroup, pullers []*Puller, msg *Message) {
+	for _, puller := range pullers {
+		go conn.pushToChan(puller, msg)
 	}
 	wg.Done()
 }
@@ -145,9 +145,9 @@ func (conn *Connection) pushToChans(wg *sync.WaitGroup, mchs map[*Puller]bool, m
 func (conn *Connection) dispatch(msg *Message) {
 	var wg sync.WaitGroup
 	wg.Add(4)
-	go conn.pushToChans(&wg, conn.center.get(all), msg)
-	go conn.pushToChans(&wg, conn.center.get(msg.Topic), msg)
-	go conn.pushToChans(&wg, conn.center.get(msg.Topic+msg.Event), msg)
-	go conn.pushToChans(&wg, conn.center.get(msg.Ref), msg)
+	go conn.pushToChans(&wg, conn.center.getPullers(all), msg)
+	go conn.pushToChans(&wg, conn.center.getPullers(msg.Topic), msg)
+	go conn.pushToChans(&wg, conn.center.getPullers(msg.Topic+msg.Event), msg)
+	go conn.pushToChans(&wg, conn.center.getPullers(msg.Ref), msg)
 	wg.Wait()
 }

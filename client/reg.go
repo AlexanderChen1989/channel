@@ -55,3 +55,14 @@ func (center *regCenter) get(key string) map[*Puller]bool {
 	center.RUnlock()
 	return m
 }
+
+func (center *regCenter) getPullers(key string) []*Puller {
+	center.RLock()
+	defer center.RUnlock()
+
+	var pullers []*Puller
+	for puller, _ := range center.regs[key] {
+		pullers = append(pullers, puller)
+	}
+	return pullers
+}
