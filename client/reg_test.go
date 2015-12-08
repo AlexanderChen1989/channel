@@ -15,12 +15,12 @@ func TestRegCenter(t *testing.T) {
 		chs = append(chs, c.register(fmt.Sprint(i)))
 	}
 	for _, ch := range chs {
-		assert.NotNil(t, c.get(ch.key))
+		assert.Equal(t, len(c.getPullers(ch.key)), 1)
 	}
 	for _, ch := range chs {
 		ch.Close()
 	}
 	for _, ch := range chs {
-		assert.Nil(t, c.get(ch.key))
+		assert.Equal(t, len(c.getPullers(ch.key)), 0)
 	}
 }

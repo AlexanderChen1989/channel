@@ -49,13 +49,6 @@ func (center *regCenter) unregister(puller *Puller) {
 	}
 }
 
-func (center *regCenter) get(key string) map[*Puller]bool {
-	center.RLock()
-	m := center.regs[key]
-	center.RUnlock()
-	return m
-}
-
 func (center *regCenter) getPullers(key string) []*Puller {
 	center.RLock()
 	defer center.RUnlock()
