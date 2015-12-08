@@ -2,19 +2,13 @@ package client
 
 import (
 	"fmt"
-	"sync"
+	"sync/atomic"
 )
 
 type refMaker struct {
-	sync.Mutex
-	index int
+	index uint64
 }
 
 func (mk *refMaker) makeRef() string {
-	mk.Lock()
-	ref := mk.index
-	mk.index++
-	mk.Unlock()
-
-	return fmt.Sprint(ref)
+	return fmt.Sprint(atomic.AddUint64(&mk.index, 1))
 }
