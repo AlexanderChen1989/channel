@@ -11,12 +11,12 @@ import (
 	"golang.org/x/net/context"
 )
 
-func pullMessage(puller *Puller, timeout time.Duration, errCh chan error) {
+func pullMessage(puller *Puller) error {
 	select {
 	case <-puller.Pull():
-		errCh <- nil
-	case <-time.After(timeout):
-		errCh <- errors.New("Timeout")
+		return nil
+	default:
+		return errors.New("no msg")
 	}
 }
 
@@ -33,7 +33,7 @@ func TestConnection(t *testing.T) {
 	defer conn.Close()
 	conn.start()
 
-	const num = 10
+	const num = 100
 	for i := 0; i < num; i++ {
 		msg := &Message{
 			Topic:   "topic" + fmt.Sprint(num%3),
@@ -42,39 +42,22 @@ func TestConnection(t *testing.T) {
 			Payload: "msg",
 		}
 		all := conn.OnMessage()
-		errCh := make(chan error)
-		go pullMessage(all, 10*time.Millisecond, errCh)
-		conn.push(msg)
-		assert.Nil(t, <-errCh)
-
-		ch1, err := conn.Chan(msg.Topic)
-		assert.Nil(t, err)
-		ch2, err := conn.Chan(msg.Topic + "xx")
-		assert.Nil(t, err)
-
+		ch1, _ := conn.Chan(msg.Topic)
+		ch2, _ := conn.Chan(msg.Topic + "xx")
 		pullerCh1 := ch1.OnMessage()
 		pullerCh2 := ch2.OnMessage()
-		pullerCh1ErrCh := make(chan error)
-		pullerCh2ErrCh := make(chan error)
-		go pullMessage(pullerCh1, 10*time.Millisecond, pullerCh1ErrCh)
-		go pullMessage(pullerCh2, 10*time.Millisecond, pullerCh2ErrCh)
-		conn.push(msg)
-		assert.Nil(t, <-pullerCh1ErrCh)
-		assert.NotNil(t, <-pullerCh2ErrCh)
-
 		pullerEvt1 := ch1.OnEvent(msg.Event)
 		pullerEvt2 := ch1.OnEvent(msg.Event + "xx")
-		pullerEvt1ErrCh := make(chan error)
-		pullerEvt2ErrCh := make(chan error)
-		go pullMessage(pullerEvt1, 10*time.Millisecond, pullerEvt1ErrCh)
-		go pullMessage(pullerEvt2, 10*time.Millisecond, pullerEvt2ErrCh)
-		conn.push(msg)
-		assert.Nil(t, <-pullerEvt1ErrCh)
-		assert.NotNil(t, <-pullerEvt2ErrCh)
+		req, _ := ch1.Request("hello_world", "body")
 
-		req, err := ch1.Request("hello_world", "body")
-		assert.Nil(t, err)
-		reqErrCh := make(chan error)
-		go pullMessage(req, 10*time.Millisecond, reqErrCh)
+		conn.msgs <- msg
+		time.Sleep(5 * time.Millisecond)
+
+		assert.Nil(t, pullMessage(all))
+		assert.Nil(t, pullMessage(pullerCh1))
+		assert.NotNil(t, pullMessage(pullerCh2))
+		assert.Nil(t, pullMessage(pullerEvt1))
+		assert.NotNil(t, pullMessage(pullerEvt2))
+		assert.Nil(t, pullMessage(req))
 	}
 }

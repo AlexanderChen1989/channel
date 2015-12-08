@@ -54,7 +54,7 @@ func (center *regCenter) getPullers(key string) []*Puller {
 	defer center.RUnlock()
 
 	var pullers []*Puller
-	for puller, _ := range center.regs[key] {
+	for puller := range center.regs[key] {
 		pullers = append(pullers, puller)
 	}
 	return pullers

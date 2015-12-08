@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"path"
 	"sync"
+	"time"
 
 	"golang.org/x/net/context"
 	"golang.org/x/net/websocket"
@@ -131,7 +132,7 @@ func (conn *Connection) Close() error {
 func (conn *Connection) pushToChan(puller *Puller, msg *Message) {
 	select {
 	case puller.ch <- msg:
-	default:
+	case <-time.After(10 * time.Millisecond):
 	}
 }
 
