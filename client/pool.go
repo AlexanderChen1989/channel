@@ -3,8 +3,7 @@ package client
 import "sync"
 
 type pool struct {
-	puller    *sync.Pool
-	pullerMap *sync.Pool
+	puller *sync.Pool
 }
 
 func newPool() *pool {
@@ -14,11 +13,6 @@ func newPool() *pool {
 				return &Puller{
 					ch: make(chan *Message, 1),
 				}
-			},
-		},
-		pullerMap: &sync.Pool{
-			New: func() interface{} {
-				return make(map[*Puller]bool)
 			},
 		},
 	}
@@ -37,15 +31,4 @@ func (p *pool) putPuller(puller *Puller) {
 	default:
 	}
 	p.puller.Put(puller)
-}
-
-func (p *pool) getPullerMap() map[*Puller]bool {
-	return p.pullerMap.Get().(map[*Puller]bool)
-}
-
-func (p *pool) putPullerMap(m map[*Puller]bool) {
-	if m == nil {
-		return
-	}
-	p.pullerMap.Put(m)
 }

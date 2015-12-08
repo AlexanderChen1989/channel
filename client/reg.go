@@ -43,6 +43,7 @@ func (center *regCenter) unregister(puller *Puller) {
 		}
 		pullers[i] = pullers[len(pullers)-1]
 		center.regs[puller.key] = pullers[:len(pullers)-1]
+		center.pool.putPuller(puller)
 		return
 	}
 
