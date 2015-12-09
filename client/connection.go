@@ -98,6 +98,7 @@ func (conn *Connection) pullLoop() {
 		msg, err := conn.sock.Recv()
 		if err != nil {
 			fmt.Printf("%s\n", err)
+			close(conn.msgs)
 			return
 		}
 		select {
@@ -113,7 +114,10 @@ func (conn *Connection) coreLoop() {
 		select {
 		case <-conn.ctx.Done():
 			return
-		case msg := <-conn.msgs:
+		case msg, ok := <-conn.msgs:
+			if !ok {
+				return
+			}
 			conn.dispatch(msg)
 		}
 	}
