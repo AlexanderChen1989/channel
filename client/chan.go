@@ -52,7 +52,8 @@ func (conn *Connection) Chan(topic string) (*Chan, error) {
 
 // OnMessage register a MsgCh to recv all msg on channel
 func (ch *Chan) OnMessage() *Puller {
-	return ch.conn.center.register(ch.topic)
+	key := toKey(ch.topic, "", "")
+	return ch.conn.center.register(key)
 }
 
 // Join channel join, return a MsgCh to receive join result
@@ -67,7 +68,8 @@ func (ch *Chan) Leave() (*Puller, error) {
 
 // OnEvent return a MsgCh to receive all msg on some event on this channel
 func (ch *Chan) OnEvent(evt string) *Puller {
-	return ch.conn.center.register(ch.topic + evt)
+	key := toKey(ch.topic, evt, "")
+	return ch.conn.center.register(key)
 }
 
 // Request send a msg to channel and return a MsgCh to receive reply
@@ -78,7 +80,8 @@ func (ch *Chan) Request(evt string, payload interface{}) (*Puller, error) {
 		Ref:     ch.conn.ref.makeRef(),
 		Payload: payload,
 	}
-	puller := ch.conn.center.register(msg.Ref)
+	key := toKey(ch.topic, evt, msg.Ref)
+	puller := ch.conn.center.register(key)
 	if err := ch.conn.push(msg); err != nil {
 		puller.Close()
 		return nil, err
