@@ -51,10 +51,8 @@ func (mux *Mux) Handle(ws *websocket.Conn) {
 	}
 	id := mux.socket.ID(ctx)
 
-	_ = NewTransport(mux, ctx, ws, id)
-	// start tr
-	// read join msg from tr
-	// join tr to channel
+	tr := NewTransport(mux, ctx, ws, id)
+	tr.Start()
 }
 
 // Add pattern to Handler map

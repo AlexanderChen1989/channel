@@ -10,12 +10,15 @@ type Finder interface {
 }
 
 type Transport struct {
-	finder  Finder
-	ctx     context.Context
-	conn    *websocket.Conn
-	id      string
-	ReadCh  <-chan *Message
-	WriteCh chan<- *Message
+	finder Finder
+	ctx    context.Context
+	conn   *websocket.Conn
+	id     string
+}
+
+func (tr *Transport) Start() {
+	// start transport loop
+	// start message dispatch loop
 }
 
 func NewTransport(finder Finder, ctx context.Context, conn *websocket.Conn, id string) *Transport {
