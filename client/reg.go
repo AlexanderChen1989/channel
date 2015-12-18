@@ -1,10 +1,17 @@
 package client
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+)
 
 type regCenter struct {
 	sync.RWMutex
 	regs map[string][]*Puller
+}
+
+func toKey(topic, event, ref string) string {
+	return fmt.Sprintf("KEY:%s:%s:%s:", topic, event, ref)
 }
 
 func newRegCenter() *regCenter {
