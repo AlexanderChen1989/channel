@@ -42,7 +42,7 @@ var tcs = []struct {
 func TestRouter(t *testing.T) {
 	for _, tc := range tcs {
 		r := NewMux()
-		handler := &JoinHandler{}
+		handler := new(Channel)
 		err := r.Add(tc.pattern, handler)
 
 		if tc.wrongPattern {
@@ -64,9 +64,9 @@ func TestRouter(t *testing.T) {
 }
 
 func BenchmarkRouter(b *testing.B) {
-	r := Mux{m: make(map[string]WSHandler)}
-	r.Add("rooms:alex", &JoinHandler{})
-	r.Add("rooms:*", &JoinHandler{})
+	r := Mux{m: make(map[string]*Channel)}
+	r.Add("rooms:alex", nil)
+	r.Add("rooms:*", nil)
 	for i := 0; i < b.N; i++ {
 		r.Find("rooms:alex")
 	}
