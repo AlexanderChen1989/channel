@@ -1,6 +1,8 @@
 package server
 
 import (
+	"fmt"
+
 	"golang.org/x/net/context"
 	"golang.org/x/net/websocket"
 )
@@ -14,10 +16,35 @@ type Transport struct {
 	ctx    context.Context
 	conn   *websocket.Conn
 	id     string
+
+	clients []*Client
+	pushCh  chan *Message
+}
+
+func (tr *Transport) pushLoop() {
+	for msg := range tr.pushCh {
+		websocket.JSON.Send(tr.conn, msg)
+	}
+}
+
+func (tr *Transport) pullLoop() {
+	for {
+		msg := &Message{}
+		err := websocket.JSON.Receive(tr.conn, &msg)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		select {
+		case <-tr.ctx.Done():
+			return
+		}
+
+	}
 }
 
 func (tr *Transport) Start() {
-	// start transport loop
+	// start transport loops
 	// start message dispatch loop
 }
 
