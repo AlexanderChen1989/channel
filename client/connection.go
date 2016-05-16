@@ -91,6 +91,22 @@ func (conn *Connection) push(msg *Message) error {
 }
 
 func (conn *Connection) heartbeatLoop() {
+	msg := &Message{
+		Topic:   "phoenix",
+		Event:   "heartbeat",
+		Ref:     conn.ref.makeRef(),
+		Payload: "",
+	}
+	for {
+		select {
+		case <-time.After(30000 * time.Millisecond):
+			conn.sock.Send(msg)
+		case <-conn.ctx.Done():
+			return
+
+		}
+
+	}
 }
 
 func (conn *Connection) pullLoop() {
@@ -126,6 +142,7 @@ func (conn *Connection) coreLoop() {
 func (conn *Connection) start() {
 	go conn.pullLoop()
 	go conn.coreLoop()
+	go conn.heartbeatLoop()
 }
 
 func (conn *Connection) Close() error {
