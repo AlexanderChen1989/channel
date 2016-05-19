@@ -166,10 +166,11 @@ func (conn *Connection) pushToChans(wg *sync.WaitGroup, pullers []*Puller, msg *
 
 func (conn *Connection) dispatch(msg *Message) {
 	var wg sync.WaitGroup
+	fmt.Println("in dispatch")
 	wg.Add(4)
 	go conn.pushToChans(&wg, conn.center.getPullers(all), msg)
-	go conn.pushToChans(&wg, conn.center.getPullers(msg.Topic), msg)
-	go conn.pushToChans(&wg, conn.center.getPullers(msg.Topic+msg.Event), msg)
-	go conn.pushToChans(&wg, conn.center.getPullers(msg.Ref), msg)
+	go conn.pushToChans(&wg, conn.center.getPullers(toKey(msg.Topic, "", "")), msg)
+	go conn.pushToChans(&wg, conn.center.getPullers(toKey(msg.Topic, msg.Event, "")), msg)
+	go conn.pushToChans(&wg, conn.center.getPullers(toKey("", "", msg.Ref)), msg)
 	wg.Wait()
 }
