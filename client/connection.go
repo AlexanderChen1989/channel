@@ -94,18 +94,17 @@ func (conn *Connection) heartbeatLoop() {
 	msg := &Message{
 		Topic:   "phoenix",
 		Event:   "heartbeat",
-		Ref:     conn.ref.makeRef(),
 		Payload: "",
 	}
 	for {
 		select {
 		case <-time.After(30000 * time.Millisecond):
+			// Set the message reference right before we send it:
+			msg.Ref = conn.ref.makeRef()
 			conn.sock.Send(msg)
 		case <-conn.ctx.Done():
 			return
-
 		}
-
 	}
 }
 

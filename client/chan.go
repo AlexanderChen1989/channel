@@ -80,7 +80,9 @@ func (ch *Chan) Request(evt string, payload interface{}) (*Puller, error) {
 		Ref:     ch.conn.ref.makeRef(),
 		Payload: payload,
 	}
-	key := toKey(ch.topic, evt, msg.Ref)
+	// If we're receiving a reply, all we care about is that message references
+	// Match. Connection.dispatch has a dispatcher for this key pattern ("","",msg.Ref)
+	key := toKey("", "", msg.Ref)
 	puller := ch.conn.center.register(key)
 	if err := ch.conn.push(msg); err != nil {
 		puller.Close()
