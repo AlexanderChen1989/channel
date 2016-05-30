@@ -91,6 +91,21 @@ func (conn *Connection) push(msg *Message) error {
 }
 
 func (conn *Connection) heartbeatLoop() {
+	msg := &Message{
+		Topic:   "phoenix",
+		Event:   "heartbeat",
+		Payload: "",
+	}
+	for {
+		select {
+		case <-time.After(30000 * time.Millisecond):
+			// Set the message reference right before we send it:
+			msg.Ref = conn.ref.makeRef()
+			conn.sock.Send(msg)
+		case <-conn.ctx.Done():
+			return
+		}
+	}
 }
 
 func (conn *Connection) pullLoop() {
@@ -126,6 +141,7 @@ func (conn *Connection) coreLoop() {
 func (conn *Connection) start() {
 	go conn.pullLoop()
 	go conn.coreLoop()
+	go conn.heartbeatLoop()
 }
 
 func (conn *Connection) Close() error {
@@ -151,8 +167,8 @@ func (conn *Connection) dispatch(msg *Message) {
 	var wg sync.WaitGroup
 	wg.Add(4)
 	go conn.pushToChans(&wg, conn.center.getPullers(all), msg)
-	go conn.pushToChans(&wg, conn.center.getPullers(msg.Topic), msg)
-	go conn.pushToChans(&wg, conn.center.getPullers(msg.Topic+msg.Event), msg)
-	go conn.pushToChans(&wg, conn.center.getPullers(msg.Ref), msg)
+	go conn.pushToChans(&wg, conn.center.getPullers(toKey(msg.Topic, "", "")), msg)
+	go conn.pushToChans(&wg, conn.center.getPullers(toKey(msg.Topic, msg.Event, "")), msg)
+	go conn.pushToChans(&wg, conn.center.getPullers(toKey("", "", msg.Ref)), msg)
 	wg.Wait()
 }
