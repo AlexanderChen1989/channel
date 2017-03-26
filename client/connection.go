@@ -115,6 +115,7 @@ func (conn *Connection) pullLoop() {
 			conn.msgs <- nil
 			fmt.Printf("%s\n", err)
 			close(conn.msgs)
+			conn.closePullers(conn.center.getPullers(all))
 			return
 		}
 		select {
@@ -131,7 +132,7 @@ func (conn *Connection) coreLoop() {
 		case <-conn.ctx.Done():
 			return
 		case msg, ok := <-conn.msgs:
-			if !ok {
+			if !ok || msg == nil {
 				return
 			}
 			conn.dispatch(msg)
@@ -164,21 +165,20 @@ func (conn *Connection) pushToChans(wg *sync.WaitGroup, pullers []*Puller, msg *
 	wg.Done()
 }
 
+func (conn *Connection) closePullers(pullers []*Puller) {
+	for _, puller := range pullers {
+		close(puller.ch)
+	}
+}
+
 func (conn *Connection) dispatch(msg *Message) {
 	var wg sync.WaitGroup
 
-	if msg == nil {
-		wg.Add(1)
-		go conn.pushToChans(&wg, conn.center.getPullers(all), msg)
-
-	} else {
-		wg.Add(4)
-		go conn.pushToChans(&wg, conn.center.getPullers(all), msg)
-		go conn.pushToChans(&wg, conn.center.getPullers(toKey(msg.Topic, "", "")), msg)
-		go conn.pushToChans(&wg, conn.center.getPullers(toKey(msg.Topic, msg.Event, "")), msg)
-		go conn.pushToChans(&wg, conn.center.getPullers(toKey("", "", msg.Ref)), msg)
-
-	}
+	wg.Add(4)
+	go conn.pushToChans(&wg, conn.center.getPullers(all), msg)
+	go conn.pushToChans(&wg, conn.center.getPullers(toKey(msg.Topic, "", "")), msg)
+	go conn.pushToChans(&wg, conn.center.getPullers(toKey(msg.Topic, msg.Event, "")), msg)
+	go conn.pushToChans(&wg, conn.center.getPullers(toKey("", "", msg.Ref)), msg)
 
 	wg.Wait()
 }
