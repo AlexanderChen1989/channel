@@ -186,12 +186,10 @@ func (conn *Connection) closeAllPullers() {
 
 func (conn *Connection) dispatch(msg *Message) {
 	var wg sync.WaitGroup
-
 	wg.Add(4)
 	go conn.pushToChans(&wg, conn.center.getPullers(all), msg)
 	go conn.pushToChans(&wg, conn.center.getPullers(toKey(msg.Topic, "", "")), msg)
 	go conn.pushToChans(&wg, conn.center.getPullers(toKey(msg.Topic, msg.Event, "")), msg)
 	go conn.pushToChans(&wg, conn.center.getPullers(toKey("", "", msg.Ref)), msg)
-
 	wg.Wait()
 }
