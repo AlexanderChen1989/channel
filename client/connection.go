@@ -115,7 +115,7 @@ func (conn *Connection) pullLoop() {
 			conn.msgs <- nil
 			fmt.Printf("%s\n", err)
 			close(conn.msgs)
-			conn.closePullers(conn.center.getPullers(all))
+			conn.closeAllPullers()
 			return
 		}
 		select {
@@ -169,6 +169,19 @@ func (conn *Connection) closePullers(pullers []*Puller) {
 	for _, puller := range pullers {
 		close(puller.ch)
 	}
+}
+
+func (conn *Connection) closeAllPullers() {
+
+	conn.center.RLock()
+	defer conn.center.RUnlock()
+
+	for _, pullers := range conn.center.regs {
+		for _, puller := range pullers {
+			close(puller.ch)
+		}
+	}
+
 }
 
 func (conn *Connection) dispatch(msg *Message) {
